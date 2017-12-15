@@ -13,11 +13,38 @@ int plazas, plantas;
 int libres;
 int boolean = 1;
 MPI_Status mpistatus2;
+int esperando = 0;
 
 typedef struct {
   int tipo;
   int rank;
 } vehiculo;
+
+vehiculo* vehiculos;
+
+void insertar(vehiculo v) {
+  int i, boolean=1;
+  for(i=0; i<esperando; i++) {
+    if(vehiculos[i].rank == v.rank) {
+      i = esperando;
+      boolean = 0;
+    }
+  }
+  if(boolean) {
+    vehiculos[esperando] = v;
+    esperando++;
+  }
+}
+
+void buscarYEliminar(vehiculo v) {
+  int i;
+  for(i=0; i<esperando; i++) {
+    if(vehiculos[i].rank == v.rank) {
+      vehiculos[i] = vehiculos[esperando-1];
+      esperando--;
+    }
+  }
+}
 
 void imprimirMatriz() {
   int i, j;
@@ -30,8 +57,6 @@ void imprimirMatriz() {
 }
 
 int buscarPlazas(int *plaza, int *planta, vehiculo v) {
-  printf("%d\n", v.rank);
-  MPI_Status mpistatus;
   if(v.tipo == 1) {
     //HAY QUE BUSCAR DOS SITIOS CONTINUOS
     int i, j;
@@ -61,8 +86,6 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
     }
   } else {
     // HAY QUE BUSCAR UN SITIO
-    // while(!libres);
-    printf("%d\n", v.rank);
     int i, j;
     for(i=0; i<plazas; i++) {
       for(j=0; j<plantas; j++) {
@@ -70,7 +93,6 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
           parking[i][j] = 0;
           libres++;
           printf("SALIDA: Coche %d saliendo. Plazas libres: %d\n", v.rank, libres);
-          // MPI_Send(&boolean, 1, MPI_INT, 0, BOOLEAN, MPI_COMM_WORLD);
           return 0;
         }
       }
@@ -87,26 +109,40 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
         }
       }
     }
-    printf("%d\n", v.rank);
-    // MPI_Recv(&boolean, 1, MPI_INT, 0, BOOLEAN, MPI_COMM_WORLD, &mpistatus2);
-    printf("%d\n", v.rank);
   }
+  return -1;
 }
 
-void camiones(int ranking) {
+int camiones(int ranking) {
   int plaza=0, planta=0;
   vehiculo v;
   v.tipo=1;
   v.rank=ranking;
-  buscarPlazas(&plaza, &planta, v);
+  int salida = buscarPlazas(&plaza, &planta, v);
+  if(salida == -1) {
+    insertar(v);
+    return -1;
+  } else {
+    buscarYEliminar(v);
+    imprimirMatriz();
+    return 0;
+  }
 }
 
-void coches(int ranking) {
+int coches(int ranking) {
   int plaza=0, planta=0;
   vehiculo v;
   v.tipo=2;
   v.rank=ranking;
-  buscarPlazas(&plaza, &planta, v);
+  int salida = buscarPlazas(&plaza, &planta, v);
+  if(salida == -1) {
+    insertar(v);
+    return -1;
+  } else {
+    buscarYEliminar(v);
+    imprimirMatriz();
+    return 0;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -135,20 +171,21 @@ int main(int argc, char** argv) {
     }
   }
 
+  vehiculos = (vehiculo*) malloc(sizeof(vehiculo) * 1000);
+
   int quien;
   MPI_Barrier(MPI_COMM_WORLD);
   while(1) {
+    for(i=0; i<esperando; i++) {
+      if(vehiculos[i].tipo == 1) camiones(vehiculos[i].rank);
+      else coches(vehiculos[i].rank);
+    }
     MPI_Recv(&quien, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &mpistatus);
     if(mpistatus.MPI_TAG == 1) {
-      printf("CAMION\n");
       camiones(quien);
-      imprimirMatriz();
     } else {
-      printf("COCHE\n");
       coches(quien);
-      imprimirMatriz();
     }
-    //printf("HOLA\n");
     fflush(stdout);
   }
   // Terminar MPI

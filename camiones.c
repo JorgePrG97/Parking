@@ -16,12 +16,10 @@ int main(int argc, char** argv) {
   MPI_Barrier(MPI_COMM_WORLD);
   while(1) {
     MPI_Send(&myrank, 1, MPI_INT, 0, CAMION, MPI_COMM_WORLD);
-    // printf("%d\n", myrank);
 
     srand(time(NULL));
     int r = rand() % 3;
     sleep(myrank+r);
-    // sleep(1);
   }
 
   // Terminar MPI
