@@ -12,6 +12,7 @@ int** parking;
 int plazas, plantas;
 int libres;
 int boolean = 1;
+MPI_Status mpistatus2;
 
 typedef struct {
   int tipo;
@@ -22,13 +23,14 @@ void imprimirMatriz() {
   int i, j;
   for(i=0; i<plazas; i++) {
     for(j=0; j<plantas; j++) {
-      printf("%d\t", parking[i][j]);
+      printf("[%d]\t", parking[i][j]);
     }
     printf("\n");
   }
 }
 
 int buscarPlazas(int *plaza, int *planta, vehiculo v) {
+  printf("%d\n", v.rank);
   MPI_Status mpistatus;
   if(v.tipo == 1) {
     //HAY QUE BUSCAR DOS SITIOS CONTINUOS
@@ -59,6 +61,8 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
     }
   } else {
     // HAY QUE BUSCAR UN SITIO
+    // while(!libres);
+    printf("%d\n", v.rank);
     int i, j;
     for(i=0; i<plazas; i++) {
       for(j=0; j<plantas; j++) {
@@ -66,6 +70,7 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
           parking[i][j] = 0;
           libres++;
           printf("SALIDA: Coche %d saliendo. Plazas libres: %d\n", v.rank, libres);
+          // MPI_Send(&boolean, 1, MPI_INT, 0, BOOLEAN, MPI_COMM_WORLD);
           return 0;
         }
       }
@@ -82,6 +87,9 @@ int buscarPlazas(int *plaza, int *planta, vehiculo v) {
         }
       }
     }
+    printf("%d\n", v.rank);
+    // MPI_Recv(&boolean, 1, MPI_INT, 0, BOOLEAN, MPI_COMM_WORLD, &mpistatus2);
+    printf("%d\n", v.rank);
   }
 }
 
@@ -132,12 +140,15 @@ int main(int argc, char** argv) {
   while(1) {
     MPI_Recv(&quien, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &mpistatus);
     if(mpistatus.MPI_TAG == 1) {
+      printf("CAMION\n");
       camiones(quien);
       imprimirMatriz();
     } else {
+      printf("COCHE\n");
       coches(quien);
       imprimirMatriz();
     }
+    //printf("HOLA\n");
     fflush(stdout);
   }
   // Terminar MPI
